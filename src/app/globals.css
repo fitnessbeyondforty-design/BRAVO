@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Tokens ---------- */
+:root {
+  --paper: theme(colors.paper.50);
+  --ink: theme(colors.ink.DEFAULT);
+  --gold: theme(colors.gold.400);
+  --header-h: 4.5rem;
+  color-scheme: light;
+}
+
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 1rem); }
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern', 'liga', 'calt';
+}
+::selection { background: theme(colors.gold.200); color: theme(colors.teal.900); }
+
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold tracking-wide
+           transition duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
+           focus-visible:outline-gold-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-gold {
+    @apply btn text-teal-900 shadow-[0_10px_30px_-12px_rgba(200,152,84,.8)];
+    background-image: linear-gradient(135deg, #E6CD9C 0%, #C89854 45%, #B98A49 100%);
+    background-size: 200% 100%;
+    background-position: 0 0;
+  }
+  .btn-gold:hover { background-position: 100% 0; transform: translateY(-1px); }
+  .btn-ink { @apply btn bg-teal-700 text-paper-50 hover:bg-teal-600; }
+  .btn-ghost-light { @apply btn text-paper-50 ring-1 ring-inset ring-paper-50/30 hover:bg-paper-50/10 hover:ring-gold-300/70; }
+  .btn-ghost { @apply btn text-teal-700 ring-1 ring-inset ring-teal-700/20 hover:ring-gold-500 hover:text-gold-700; }
+
+  /* Small caps label ("eyebrow") */
+  .eyebrow { @apply font-display text-[0.7rem] font-semibold uppercase tracking-[0.28em]; }
+
+  /* Gold hairline rule with centre diamond */
+  .rule-ornament {
+    @apply relative flex items-center gap-4 text-gold-500;
+  }
+  .rule-ornament::before, .rule-ornament::after {
+    content: ''; @apply h-px flex-1 bg-gradient-to-r from-transparent via-gold-400/60 to-transparent;
+  }
+
+  /* Form field on paper */
+  .field {
+    @apply mt-1.5 block w-full rounded-lg border-0 bg-white px-4 py-3 text-ink shadow-sm ring-1 ring-inset ring-paper-300
+           placeholder:text-ink-muted/60 transition focus:outline-none focus:ring-2 focus:ring-gold-500;
+  }
+  .label { @apply block text-sm font-medium text-ink-soft; }
+
+  /* Foil text */
+  .text-foil {
+    background-image: linear-gradient(100deg, #B98A49 0%, #E6CD9C 22%, #C89854 40%, #F3E6CC 55%, #B98A49 75%, #D6A35B 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* Guilloché-style fine pattern for dark bands */
+  .bg-guilloche {
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(200,152,84,.18), transparent 60%),
+      repeating-radial-gradient(circle at 80% 30%, rgba(200,152,84,.07) 0 1px, transparent 1px 14px);
+  }
+  .bg-paper-grain {
+    background-image:
+      radial-gradient(rgba(12,36,40,.035) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+}
+
+/* ---------- Scroll reveal (progressive: content is visible without JS) ---------- */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .9s cubic-bezier(.2,.7,.2,1), transform .9s cubic-bezier(.2,.7,.2,1);
+  transition-delay: var(--d, 0ms);
+}
+.js [data-reveal='fade'] { transform: none; }
+.js [data-reveal='scale'] { transform: scale(.96); }
+.js [data-reveal].is-in { opacity: 1; transform: none; }
+
+/* Image hover zoom inside cards */
+.zoom-img img { transition: transform 1.2s cubic-bezier(.2,.7,.2,1); }
+.zoom-img:hover img, .zoom-img:focus-visible img { transform: scale(1.06); }
+
+/* Marquee pause on hover */
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+/* Rich body text from the CMS */
+.record-prose img { border-radius: .75rem; }
+.record-prose > :first-child { margin-top: 0; }
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .js [data-reveal] { opacity: 1; transform: none; }
+}

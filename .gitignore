@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.local
+.DS_Store
+*.log
+.vercel
+.env.local.txt
+deploy-bravo.bat
+deploy2.bat
