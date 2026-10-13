@@ -1,6 +1,6 @@
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
 import { db } from './index'
-import { categories, pages, recordCategories, records, submissions, users } from './schema'
+import { categories, heroSlots, homeFeatures, pages, recordCategories, records, submissions, users } from './schema'
 
 /** First image attached to a record (migrated featured image), as a storage key. */
 // NB: fully-qualified "records"."id" on purpose — Drizzle drops the table prefix in single-table
@@ -60,6 +60,31 @@ export async function getFeaturedRecords(limit = 6) {
     .where(isNotNull(records.publishedAt))
     .orderBy(desc(records.featured), desc(records.publishedAt))
     .limit(limit) as Promise<RecordCardRow[]>
+}
+
+/**
+ * Admin-curated "latest entries in the Book" (home_features), in slot order, published only.
+ * Empty => caller falls back to getFeaturedRecords.
+ */
+export async function getHomeFeatureRecords(limit = 7) {
+  if (!db) return [] as RecordCardRow[]
+  return db.select(cardFields).from(homeFeatures)
+    .innerJoin(records, eq(records.id, homeFeatures.recordId))
+    .where(isNotNull(records.publishedAt))
+    .orderBy(asc(homeFeatures.position))
+    .limit(limit) as Promise<RecordCardRow[]>
+}
+
+/**
+ * Admin-curated hero photos (hero_slots), in slot order, published + with an image only.
+ * Empty => caller falls back to the latest records that have an image.
+ */
+export async function getHeroRecords() {
+  if (!db) return [] as RecordCardRow[]
+  return db.select(cardFields).from(heroSlots)
+    .innerJoin(records, eq(records.id, heroSlots.recordId))
+    .where(isNotNull(records.publishedAt))
+    .orderBy(asc(heroSlots.position)) as Promise<RecordCardRow[]>
 }
 
 /** Other published records sharing the record's primary category (falls back to latest). */
@@ -152,6 +177,58 @@ export async function getCategories() {
   return db.select({ id: categories.id, name: categories.name }).from(categories)
     .where(notInArray(categories.slug, ['uncategorized', 'featured']))
     .orderBy(categories.name)
+}
+
+export type DraftRecordRow = {
+  id: string; slug: string; title: string; holderName: string; categoryName: string | null
+}
+
+/** Unpublished (draft) records awaiting an admin publish decision, earliest verification first. */
+export async function getDraftRecords() {
+  if (!db) return [] as DraftRecordRow[]
+  return db.select({
+    id: records.id, slug: records.slug, title: records.title,
+    holderName: records.holderName, categoryName,
+  }).from(records)
+    .where(isNull(records.publishedAt))
+    .orderBy(asc(records.verifiedAt), asc(records.slug)) as Promise<DraftRecordRow[]>
+}
+
+/** Registry totals for the admin records page. */
+export async function getRecordCounts() {
+  if (!db) return { published: 0, drafts: 0 }
+  const rows = await db.select({
+    published: sql<number>`count(*) filter (where ${records.publishedAt} is not null)::int`,
+    drafts: sql<number>`count(*) filter (where ${records.publishedAt} is null)::int`,
+  }).from(records)
+  const r = rows[0]
+  return { published: Number(r?.published ?? 0), drafts: Number(r?.drafts ?? 0) }
+}
+
+export type PickerRecord = { id: string; slug: string; title: string; holderName: string; imageKey: string | null }
+
+/** Every published record (id/title/holder/image) for the homepage admin pickers. */
+export async function getRecordPickerCatalog() {
+  if (!db) return [] as PickerRecord[]
+  return db.select({
+    id: records.id, slug: records.slug, title: records.title, holderName: records.holderName, imageKey,
+  }).from(records)
+    .where(isNotNull(records.publishedAt))
+    .orderBy(asc(records.title)) as Promise<PickerRecord[]>
+}
+
+/** Current hero-slot record ids, in slot order (for the admin editor). */
+export async function getHeroSlotIds() {
+  if (!db) return [] as string[]
+  const rows = await db.select({ recordId: heroSlots.recordId }).from(heroSlots).orderBy(asc(heroSlots.position))
+  return rows.map((r) => r.recordId)
+}
+
+/** Current home-feature record ids, in order (for the admin editor). */
+export async function getHomeFeatureIds() {
+  if (!db) return [] as string[]
+  const rows = await db.select({ recordId: homeFeatures.recordId }).from(homeFeatures).orderBy(asc(homeFeatures.position))
+  return rows.map((r) => r.recordId)
 }
 
 export async function getPage(slug: string) {

@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, uuid, text, timestamp, integer, boolean, jsonb, index, primaryKey } from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, text, timestamp, integer, smallint, boolean, jsonb, index, primaryKey } from 'drizzle-orm/pg-core'
 
 export const role = pgEnum('role', ['SUPER_ADMIN', 'MODERATOR', 'RECORD_HOLDER', 'PUBLIC_USER'])
 export const submissionStatus = pgEnum('submission_status', ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'NEEDS_CHANGES', 'APPROVED', 'REJECTED', 'PUBLISHED'])
@@ -50,6 +50,29 @@ export const recordCategories = pgTable('record_categories', {
   recordId: uuid('record_id').notNull().references(() => records.id, { onDelete: 'cascade' }),
   categoryId: uuid('category_id').notNull().references(() => categories.id, { onDelete: 'cascade' }),
 }, (t) => ({ pk: primaryKey({ columns: [t.recordId, t.categoryId] }) }))
+
+/**
+ * Admin-curated homepage hero: which records' photos fill the three plates beside the
+ * seal (MASTER-BRIEF §8 item: "replace the hero section photos"). Empty => the homepage
+ * falls back to auto-picking the latest records with an image. Writes go through the
+ * server-side postgres connection; public has read-only RLS.
+ */
+export const heroSlots = pgTable('hero_slots', {
+  position: smallint('position').primaryKey(),
+  recordId: uuid('record_id').notNull().references(() => records.id, { onDelete: 'cascade' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+/**
+ * Admin-curated "latest entries in the Book" order (MASTER-BRIEF §8 item: choose which
+ * post appears where / sequence). Lower position shows first. Empty => the homepage falls
+ * back to the `featured` flag + newest-first.
+ */
+export const homeFeatures = pgTable('home_features', {
+  recordId: uuid('record_id').primaryKey().references(() => records.id, { onDelete: 'cascade' }),
+  position: integer('position').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
 
 /** CMS-style static pages (about, contact, terms). */
 export const pages = pgTable('pages', {

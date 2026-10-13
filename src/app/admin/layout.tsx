@@ -15,6 +15,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav aria-label="Admin" className="flex flex-wrap items-center gap-4 text-sm text-ink-soft">
           <Link href="/admin/dashboard" className="hover:text-gold-700">Dashboard</Link>
           <Link href="/admin/submissions" className="hover:text-gold-700">Submissions</Link>
+          <Link href="/admin/records" className="hover:text-gold-700">Records</Link>
+          <Link href="/admin/homepage" className="hover:text-gold-700">Homepage</Link>
           <span className="text-ink-muted" title={user.email}>{role?.replace('_', ' ').toLowerCase()}</span>
           <form action={signOut}>
             <button type="submit" className="rounded-md px-2 py-1 ring-1 ring-paper-300 hover:text-gold-700">Sign out</button>

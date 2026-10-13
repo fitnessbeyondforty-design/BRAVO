@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { getCategoriesWithCounts, getFeaturedRecords, getPublishedRecords, getRegistryStats } from '@/server/db/queries'
+import { getCategoriesWithCounts, getFeaturedRecords, getHeroRecords, getHomeFeatureRecords, getPublishedRecords, getRegistryStats } from '@/server/db/queries'
 import { RecordCard } from '@/components/records/RecordCard'
 import { Seal } from '@/components/brand/Seal'
 import { CountUp } from '@/components/motion/CountUp'
@@ -21,15 +21,21 @@ const STEPS = [
 ]
 
 export default async function HomePage() {
-  const [featured, cats, stats, latest] = await Promise.all([
+  const [featured, cats, stats, latest, heroPicks, homePicks] = await Promise.all([
     getFeaturedRecords(7),
     getCategoriesWithCounts(),
     getRegistryStats(),
     getPublishedRecords({ limit: 16 }),
+    getHeroRecords(),
+    getHomeFeatureRecords(7),
   ])
   const topCats = cats.filter((c) => !HIDE.has(c.slug))
-  const [lead, ...rest] = featured
-  const collage = latest.rows.filter((r) => r.imageKey).slice(0, 3)
+  // Admin-curated "latest entries" (home_features) when set, else featured + newest.
+  const entries = homePicks.length ? homePicks : featured
+  const [lead, ...rest] = entries
+  // Admin-curated hero photos (hero_slots) when set, else the latest records that have an image.
+  const heroImgs = heroPicks.filter((r) => r.imageKey)
+  const collage = (heroImgs.length ? heroImgs : latest.rows.filter((r) => r.imageKey)).slice(0, 3)
   const ticker = latest.rows
 
   return (

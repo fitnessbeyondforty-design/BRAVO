@@ -8,11 +8,12 @@ type Props = {
   action: (prev: AuthState, formData: FormData) => Promise<AuthState>
   next: string
   initialError?: string
+  notice?: string
 }
 
 const input = 'field'
 
-export function AuthForm({ mode, action, next, initialError }: Props) {
+export function AuthForm({ mode, action, next, initialError, notice }: Props) {
   const [state, formAction, pending] = useActionState(action, initialError ? { error: initialError } : undefined)
   const isSignUp = mode === 'sign-up'
   const q = next !== '/' ? `?next=${encodeURIComponent(next)}` : ''
@@ -24,6 +25,12 @@ export function AuthForm({ mode, action, next, initialError }: Props) {
       <p className="mt-3 text-ink-muted">
         {isSignUp ? 'Apply for records and track your submissions.' : 'Welcome back to Bravo World Records.'}
       </p>
+
+      {notice && (
+        <p role="status" className="mt-8 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800 ring-1 ring-emerald-200">
+          {notice}
+        </p>
+      )}
 
       {state?.message ? (
         <p role="status" className="mt-8 rounded-xl bg-paper-100 p-5 text-sm text-teal-700 ring-1 ring-gold-400/50">
@@ -37,7 +44,14 @@ export function AuthForm({ mode, action, next, initialError }: Props) {
             <input id="email" name="email" type="email" autoComplete="email" required className={input} />
           </div>
           <div>
-            <label htmlFor="password" className="label">Password</label>
+            <div className="flex items-baseline justify-between gap-2">
+              <label htmlFor="password" className="label">Password</label>
+              {!isSignUp && (
+                <Link href="/forgot-password" className="text-xs font-medium text-gold-700 underline-offset-4 hover:underline">
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <input id="password" name="password" type="password" required minLength={8}
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               aria-describedby={isSignUp ? 'pw-hint' : undefined} className={input} />

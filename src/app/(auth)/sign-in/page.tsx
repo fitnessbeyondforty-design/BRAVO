@@ -11,13 +11,15 @@ const ERRORS: Record<string, string> = {
   confirm: 'That confirmation link is invalid or has expired. Sign in or request a new link.',
 }
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
-  const { next = '/', error } = await searchParams
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string; reset?: string }> }) {
+  const { next = '/', error, reset } = await searchParams
   const safe = next.startsWith('/') && !next.startsWith('//') ? next : '/'
   if (await getSessionUser()) redirect(safe)
   return (
     <AuthShell>
-      <AuthForm mode="sign-in" action={signIn} next={safe} initialError={error ? ERRORS[error] : undefined} />
+      <AuthForm mode="sign-in" action={signIn} next={safe}
+        initialError={error ? ERRORS[error] : undefined}
+        notice={reset ? 'Your password has been updated. Sign in with your new password.' : undefined} />
     </AuthShell>
   )
 }
