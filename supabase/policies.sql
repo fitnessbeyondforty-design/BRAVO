@@ -44,7 +44,10 @@ revoke insert, update, delete, truncate on public.audit_logs  from anon, authent
 --   sub_guardian_verified             status VERIFIED <=> guardian_verified_by + guardian_verified_at set
 --   sub_minor_needs_verified_consent  minor + status APPROVED|PUBLISHED => consent VERIFIED
 
--- Media: public read of published records' media only (tightened s5).
+-- Media: public read of published records' media only (tightened s5). Submission evidence (record_id
+-- NULL, submission_id set) is therefore NOT exposed over the REST API — reviewers read it via the
+-- server-side postgres connection; the image bytes themselves are served from the public Storage
+-- bucket by unguessable (random-UUID) key.
 create policy media_public_read on public.media for select
   using (record_id is not null and exists (select 1 from public.records r where r.id = media.record_id and r.published_at is not null));
 
@@ -67,3 +70,27 @@ create trigger on_auth_user_created after insert on auth.users
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
 revoke execute on function public.current_app_role() from public, anon;
 grant  execute on function public.current_app_role() to authenticated; -- RLS needs it
+
+-- ──────────────────────────────────────────────────────────────────────────────────────────────
+-- Storage: submission evidence uploads (migration submission_media_upload_storage_policy, s18 — §8.3)
+-- ──────────────────────────────────────────────────────────────────────────────────────────────
+-- Applicants upload evidence straight to the public `record-media` bucket via a server-minted signed
+-- upload URL (src/server/actions/upload.ts chooses the key: submissions/<uid>/<uuid>.<ext>). This
+-- INSERT policy is defence-in-depth: a signed-in user can only CREATE objects under their OWN
+-- submissions/<uid>/ folder. No update/delete grant. Reads stay public (bucket.public = true).
+drop policy if exists "submission_evidence_insert" on storage.objects;
+create policy "submission_evidence_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'record-media'
+    and (storage.foldername(name))[1] = 'submissions'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+  );
+
+-- Bucket limits are the hard server-side guarantee for the direct (signed-URL) upload path, since the
+-- bytes never pass through the Node layer. PDFs + avif added alongside the existing image types; the
+-- 15 MiB cap is kept (free-tier Storage ~1 GB total — video deferred to a paid-plan iteration).
+update storage.buckets
+  set allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif','image/avif','application/pdf'],
+      file_size_limit = 15728640
+  where id = 'record-media';

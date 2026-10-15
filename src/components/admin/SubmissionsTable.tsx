@@ -10,6 +10,7 @@ export type SubmissionRow = {
   status: string
   createdAt: string
   minor: null | { guardianName: string; relationship: string; consent: 'PENDING_VERIFICATION' | 'VERIFIED' }
+  evidence: { url: string; isImage: boolean }[]
 }
 
 type Action = 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES' | 'VERIFY_GUARDIAN'
@@ -23,6 +24,26 @@ const STATUS_STYLES: Record<string, string> = {
   PUBLISHED: 'bg-teal-700 text-gold-200 ring-teal-700',
 }
 const pill = 'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset'
+
+function Evidence({ evidence, title }: { evidence: SubmissionRow['evidence']; title: string }) {
+  if (evidence.length === 0) return <p className="mt-1.5 text-xs text-ink-muted">No evidence attached</p>
+  return (
+    <div className="mt-2">
+      <p className="text-xs font-medium text-ink-muted">Evidence ({evidence.length})</p>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {evidence.map((e, i) => (
+          <a key={i} href={e.url} target="_blank" rel="noopener noreferrer"
+            title={`Open evidence ${i + 1} for ${title} in a new tab`}
+            className="block rounded-md ring-1 ring-paper-300 hover:ring-gold-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500">
+            {e.isImage
+              ? <img src={e.url} alt={`Evidence ${i + 1} for ${title}`} loading="lazy" className="h-12 w-12 rounded-md object-cover" />
+              : <span className="grid h-12 w-12 place-items-center rounded-md bg-paper-100 text-[0.6rem] font-semibold uppercase tracking-wide text-ink-soft">PDF</span>}
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
   const [pending, start] = useTransition()
@@ -69,6 +90,7 @@ export function SubmissionsTable({ rows }: { rows: SubmissionRow[] }) {
                         {r.minor.relationship}: {r.minor.guardianName}
                       </p>
                     )}
+                    <Evidence evidence={r.evidence} title={r.proposedTitle} />
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell break-all">{r.applicant}</td>
                   <td className="px-4 py-3">

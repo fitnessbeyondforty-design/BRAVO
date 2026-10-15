@@ -2,6 +2,7 @@
 import { useState, useTransition } from 'react'
 import { submitRecord } from '@/server/actions/submit-record'
 import { GUARDIAN_CONSENT_TEXT } from '@/lib/consent'
+import { MediaUploader } from '@/components/apply/MediaUploader'
 
 const field = 'field'
 
@@ -10,6 +11,8 @@ export function ApplyForm({ categories }: { categories: { id: string; name: stri
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined>>({})
   const [minor, setMinor] = useState<'yes' | 'no' | ''>('')
+  const [mediaKeys, setMediaKeys] = useState<string[]>([])
+  const [uploadBusy, setUploadBusy] = useState(false)
 
   function onSubmit(formData: FormData) {
     setError(null)
@@ -27,7 +30,7 @@ export function ApplyForm({ categories }: { categories: { id: string; name: stri
           guardianRelationship: String(formData.get('guardianRelationship') ?? '') || undefined,
           guardianConsent: formData.get('guardianConsent') === 'on',
         } : {}),
-        mediaKeys: [],
+        mediaKeys,
       })
       if (res && !res.ok) {
         setError(res.error)
@@ -132,10 +135,14 @@ export function ApplyForm({ categories }: { categories: { id: string; name: stri
         <p id="claimDetails-hint" className="mt-1.5 text-xs text-ink-muted">What you did, when, where, and who witnessed it. At least 50 characters.</p>
         {err('claimDetails')}
       </div>
+
+      <MediaUploader onKeysChange={setMediaKeys} onBusyChange={setUploadBusy} />
+      {err('mediaKeys')}
+
       {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">{error}</p>}
-      <button type="submit" disabled={pending}
-        className="btn-gold">
-        {pending ? 'Submitting…' : 'Submit for review'}
+      <button type="submit" disabled={pending || uploadBusy}
+        className="btn-gold disabled:cursor-not-allowed disabled:opacity-60">
+        {pending ? 'Submitting…' : uploadBusy ? 'Finishing uploads…' : 'Submit for review'}
       </button>
     </form>
   )

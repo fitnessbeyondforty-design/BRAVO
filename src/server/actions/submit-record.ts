@@ -2,11 +2,12 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { db } from '@/server/db'
-import { submissions, auditLogs } from '@/server/db/schema'
+import { submissions, media, auditLogs } from '@/server/db/schema'
 import { getSessionUser } from '@/server/auth/supabase'
 import { ratelimit } from '@/server/rate-limit'
 import { SubmissionInput } from '@/server/validation/submission'
 import { GUARDIAN_CONSENT_VERSION } from '@/lib/consent'
+import { mediaTypeForKey } from '@/lib/upload'
 
 export type SubmitResult =
   | { ok: true }
@@ -30,30 +31,54 @@ export async function submitRecord(raw: unknown): Promise<SubmitResult> {
 
   if (!db) return { ok: false, error: 'Database is not configured yet.' }
 
-  // 4. Insert via the server connection (the REST API is read-only on submissions).
-  //    applicant_id comes from the session; DB check constraints enforce the guardian rules.
   const d = parsed.data
   const minor = d.holderIsMinor === 'yes'
-  const [row] = await db.insert(submissions).values({
-    applicantId: user.id,
-    categoryId: d.categoryId,
-    proposedTitle: d.proposedTitle,
-    claimDetails: d.claimDetails,
-    holderName: d.holderName,
-    holderIsMinor: minor,
-    ...(minor ? {
-      guardianName: d.guardianName!,
-      guardianRelationship: d.guardianRelationship!,
-      guardianConsentAt: new Date(),
-      guardianConsentVersion: GUARDIAN_CONSENT_VERSION,
-      guardianConsentStatus: 'PENDING_VERIFICATION' as const,
-    } : {}),
-    status: 'SUBMITTED',
-  }).returning({ id: submissions.id })
 
-  await db.insert(auditLogs).values({
-    actorId: user.id, action: 'SUBMISSION_CREATED', entityType: 'submission', entityId: row.id,
-    metadata: minor ? { guardianConsent: { version: GUARDIAN_CONSENT_VERSION, relationship: d.guardianRelationship } } : null,
+  // 3b. Evidence keys were uploaded to Storage by the client via a server-minted signed URL. Trust
+  //     only keys under THIS user's own folder (the upload action scopes them to submissions/<uid>/,
+  //     and the storage RLS policy enforces it — this is the final guard against a tampered payload).
+  const prefix = `submissions/${user.id}/`
+  const mediaKeys = [...new Set(d.mediaKeys)].filter((k) => k.startsWith(prefix)).slice(0, 10)
+
+  // 4. Insert via the server connection (the REST API is read-only on submissions + media).
+  //    applicant_id comes from the session; DB check constraints enforce the guardian rules.
+  const [row] = await db.transaction(async (tx) => {
+    const inserted = await tx.insert(submissions).values({
+      applicantId: user.id,
+      categoryId: d.categoryId,
+      proposedTitle: d.proposedTitle,
+      claimDetails: d.claimDetails,
+      holderName: d.holderName,
+      holderIsMinor: minor,
+      ...(minor ? {
+        guardianName: d.guardianName!,
+        guardianRelationship: d.guardianRelationship!,
+        guardianConsentAt: new Date(),
+        guardianConsentVersion: GUARDIAN_CONSENT_VERSION,
+        guardianConsentStatus: 'PENDING_VERIFICATION' as const,
+      } : {}),
+      status: 'SUBMITTED',
+    }).returning({ id: submissions.id })
+
+    const sub = inserted[0]
+
+    if (mediaKeys.length) {
+      await tx.insert(media).values(mediaKeys.map((key) => ({
+        type: mediaTypeForKey(key),
+        storageKey: key,
+        submissionId: sub.id,
+      })))
+    }
+
+    await tx.insert(auditLogs).values({
+      actorId: user.id, action: 'SUBMISSION_CREATED', entityType: 'submission', entityId: sub.id,
+      metadata: {
+        evidenceCount: mediaKeys.length,
+        ...(minor ? { guardianConsent: { version: GUARDIAN_CONSENT_VERSION, relationship: d.guardianRelationship } } : {}),
+      },
+    })
+
+    return inserted
   })
 
   redirect(`/apply/status/${row.id}`)

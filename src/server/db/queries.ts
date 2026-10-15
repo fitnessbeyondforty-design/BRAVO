@@ -12,6 +12,9 @@ const imageHeight = sql<number | null>`(select m.height from media m where m.rec
 // Display category for cards; WordPress catch-alls read as a generic label instead.
 const categoryName = sql<string | null>`(select c.name from categories c where c.id = "records"."category_id" and c.slug not in ('uncategorized','achievers','featured'))`.as('category_name')
 
+// Evidence files attached to a submission (MASTER-BRIEF §8.3), as storage keys, oldest first.
+const submissionMediaKeys = sql<string[]>`coalesce((select array_agg(m.storage_key order by m.created_at) from media m where m.submission_id = submissions.id), '{}')`.as('media_keys')
+
 const cardFields = {
   id: records.id,
   slug: records.slug,
@@ -155,6 +158,7 @@ export async function getSubmissionQueue() {
     createdAt: submissions.createdAt, holderName: submissions.holderName, holderIsMinor: submissions.holderIsMinor,
     guardianName: submissions.guardianName, guardianRelationship: submissions.guardianRelationship,
     guardianConsentStatus: submissions.guardianConsentStatus, applicantEmail: users.email,
+    mediaKeys: submissionMediaKeys,
   }).from(submissions)
     .innerJoin(users, eq(users.id, submissions.applicantId))
     .orderBy(desc(submissions.createdAt))

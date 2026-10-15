@@ -1,6 +1,8 @@
 import { getSubmissionQueue } from '@/server/db/queries'
 import { SubmissionsTable, type SubmissionRow } from '@/components/admin/SubmissionsTable'
 import { RELATIONSHIP_LABEL } from '@/lib/consent'
+import { mediaUrl } from '@/lib/media'
+import { isImageKey } from '@/lib/upload'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +18,9 @@ export default async function SubmissionsPage() {
     minor: r.holderIsMinor && r.guardianRelationship && r.guardianConsentStatus !== 'NOT_REQUIRED'
       ? { guardianName: r.guardianName ?? '', relationship: RELATIONSHIP_LABEL[r.guardianRelationship], consent: r.guardianConsentStatus }
       : null,
+    evidence: (r.mediaKeys ?? [])
+      .map((key) => ({ url: mediaUrl(key), isImage: isImageKey(key) }))
+      .filter((e): e is { url: string; isImage: boolean } => !!e.url),
   }))
   return (
     <div>
